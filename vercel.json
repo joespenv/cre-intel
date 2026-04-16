@@ -1,0 +1,7 @@
+{
+  "name": "cre-intel-app",
+  "github": {
+    "enabled": true,
+    "autoAlias": true
+  }
+}
