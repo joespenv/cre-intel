@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>CRE Intelligence — norsk næringseiendom</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8f8f6;color:#1a1a1a;font-size:14px}
+button{cursor:pointer;font-family:inherit;background:none;border:none}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+::-webkit-scrollbar{height:4px;width:4px}::-webkit-scrollbar-track{background:#f1f1f1}::-webkit-scrollbar-thumb{background:#ccc;border-radius:2px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const { useState } = React;
+
+// ── DATA ────────────────────────────────────────────────────────────
+const LEIE = [
+  { omrade:'CBD', toppleie:6800, hoy:'6 300–5 500', moderat:3700, ledighet:12.3, delta:2.8 },
+  { omrade:'Bjørvika', toppleie:6000, hoy:'5 400–4 500', moderat:3400, ledighet:3.7, delta:0.1 },
+  { omrade:'Øvrig sentrum', toppleie:5500, hoy:'4 600–3 700', moderat:2600, ledighet:6.8, delta:0.8 },
+  { omrade:'Indre vest', toppleie:5300, hoy:'4 500–3 500', moderat:2300, ledighet:5.2, delta:0.6 },
+  { omrade:'Skøyen', toppleie:4400, hoy:'4 000–3 200', moderat:2500, ledighet:7.5, delta:0.2 },
+  { omrade:'Indre øst', toppleie:4100, hoy:'3 200–2 500', moderat:1600, ledighet:8.1, delta:-0.1 },
+  { omrade:'Nydalen', toppleie:3200, hoy:'2 900–2 200', moderat:1600, ledighet:5.2, delta:-1.7 },
+  { omrade:'Bryn/Helsfyr', toppleie:3000, hoy:'2 800–2 200', moderat:1400, ledighet:9.8, delta:-1.5 },
+  { omrade:'Lysaker', toppleie:3500, hoy:'2 900–2 400', moderat:1700, ledighet:11.5, delta:0.5 },
+  { omrade:'Fornebu', toppleie:2600, hoy:'2 400–1 800', moderat:1400, ledighet:10.5, delta:-1.0 },
+  { omrade:'Asker & Bærum', toppleie:2700, hoy:'2 400–1 800', moderat:1200, ledighet:4.0, delta:-0.2 },
+  { omrade:'Økern/Hasle/Løren', toppleie:2900, hoy:'2 400–2 000', moderat:1400, ledighet:15.3, delta:3.9 },
+  { omrade:'Indre nord', toppleie:3200, hoy:'2 800–2 200', moderat:1600, ledighet:10.7, delta:-0.7 },
+  { omrade:'Ytre vest', toppleie:2000, hoy:'1 700–1 500', moderat:1400, ledighet:5.7, delta:-0.1 },
+  { omrade:'Ytre nord og øst', toppleie:1900, hoy:'1 700–1 500', moderat:1200, ledighet:7.6, delta:1.7 },
+  { omrade:'Ytre syd', toppleie:1800, hoy:'1 600–1 400', moderat:1200, ledighet:11.0, delta:0.6 },
+];
+
+const SENTIMENT = [
+  { omrade:'CBD (Vika/Aker Brygge/Tjuvholmen)', signal:'Blandet', type:'warn', leievekst:'↑ Sterk', ledighet:'⚠ 12,3% (rehab)', risiko:'Rehab-ledighet midlertidig, men høy kortvarig', kilde:'DNB Næringsmegling / UNION mars 2026' },
+  { omrade:'Bjørvika', signal:'Sterk', type:'good', leievekst:'↑ Moderat', ledighet:'✓ 3,7% — lavest i Oslo', risiko:'Lav — lang WAULT, få ledige', kilde:'UNION M2 mars 2026 / SPF Q1 2026' },
+  { omrade:'Nydalen / Storo', signal:'God', type:'good', leievekst:'→ Stabil', ledighet:'✓ 5,2% — fallende', risiko:'Lav — ledigheten trekker ned', kilde:'DNB Næringsmegling feb 2026' },
+  { omrade:'Bryn/Helsfyr', signal:'Bedring', type:'info', leievekst:'↑ Sterk (+12–16%)', ledighet:'⚠ 9,8% — fallende', risiko:'Middels — fortsatt noe ledighet', kilde:'Realnor Q4 2024 / DNB Næringsmegling' },
+  { omrade:'Lysaker', signal:'Svak', type:'warn', leievekst:'→ Flat', ledighet:'⚠ 11,5% — stigende', risiko:'Høy — strukturell ledighet', kilde:'Entra Konsensus Q1 2025 / UNION M2' },
+  { omrade:'Fornebu', signal:'Svak', type:'warn', leievekst:'→ Flat/svak', ledighet:'⚠ 10,5% — tregt fallende', risiko:'Høy — få store leietakere', kilde:'UNION M2 mars 2026' },
+  { omrade:'Økern/Hasle/Løren/Ulven', signal:'Utfordrende', type:'bad', leievekst:'→ Flat', ledighet:'🔴 15,3% — stigende (+3,9pp)', risiko:'Høy — høyest ledighet i Oslo', kilde:'UNION M2 mars 2026' },
+  { omrade:'Asker & Bærum', signal:'Stabil', type:'good', leievekst:'→ KPI-justert', ledighet:'✓ 4,0% — lavt og stabilt', risiko:'Lav — men lav likviditet', kilde:'UNION M2 mars 2026' },
+];
+
+const YIELD = [
+  { segment:'Kontor prime (CBD)', prime:4.50, sekundar:6.25, kilde:'UNION M2', dato:'Mars 2026' },
+  { segment:'Kontor Helsfyr (konsensus)', prime:5.50, sekundar:null, kilde:'Entra Konsensus Q2 2025', dato:'Jun 2025' },
+  { segment:'Kontor Lysaker (konsensus)', prime:5.40, sekundar:null, kilde:'Entra Konsensus Q2 2025', dato:'Jun 2025' },
+  { segment:'Handel/kjøpesenter prime', prime:4.75, sekundar:6.50, kilde:'UNION M2', dato:'Mars 2026' },
+  { segment:'Lager/logistikk prime', prime:5.50, sekundar:7.00, kilde:'DNB Næringsmegling', dato:'Feb 2026' },
+  { segment:'Hotell prime', prime:5.50, sekundar:6.50, kilde:'Malling/UNION estimat', dato:'2026' },
+];
+
+const ENTRA = [
+  { kvartal:'Q4 2023', prime:4.70, helsfyr:5.70, lysaker:5.60, ledighet:'6,1%', transvol:'54 mrd', vekst:'+5,8%' },
+  { kvartal:'Q2 2024', prime:4.70, helsfyr:5.80, lysaker:5.60, ledighet:'6,3%', transvol:'81 mrd', vekst:'+3,7% (2024E)' },
+  { kvartal:'Q4 2024', prime:4.60, helsfyr:5.60, lysaker:5.50, ledighet:'6,8%', transvol:'90 mrd (2025E)', vekst:'+3,9% (2025E)' },
+  { kvartal:'Q1 2025', prime:4.60, helsfyr:5.60, lysaker:5.50, ledighet:'6,9%', transvol:'90 mrd (2025E)', vekst:'+3,0% (2025E)' },
+  { kvartal:'Q2 2025 (siste)', prime:4.50, helsfyr:5.50, lysaker:5.40, ledighet:'7,0%', transvol:'90 mrd (2025E)', vekst:'+5,1% (2026E)' },
+];
+
+const RENTE = [
+  { dato:'Jan 2023', styrings:2.75, nibor:3.10, swap5:3.80, type:'historisk' },
+  { dato:'Jun 2023', styrings:3.75, nibor:4.00, swap5:4.20, type:'historisk' },
+  { dato:'Des 2023', styrings:4.50, nibor:4.60, swap5:4.00, type:'historisk' },
+  { dato:'Jun 2024', styrings:4.50, nibor:4.65, swap5:3.90, type:'historisk' },
+  { dato:'Des 2024', styrings:4.50, nibor:4.55, swap5:3.75, type:'historisk' },
+  { dato:'Mar 2025', styrings:4.25, nibor:4.40, swap5:3.65, type:'historisk' },
+  { dato:'Mar 2026 (faktisk)', styrings:4.00, nibor:4.10, swap5:3.60, type:'faktisk' },
+  { dato:'Des 2026 (prognose)', styrings:3.75, nibor:null, swap5:null, type:'prognose' },
+  { dato:'Des 2027 (prognose)', styrings:3.50, nibor:null, swap5:null, type:'prognose' },
+];
+
+const BYGG = [
+  { ar:'2019', indeks:100.0, vekst:null, merknad:'Basisår' },
+  { ar:'2020', indeks:101.2, vekst:1.2, merknad:'Covid-stabilisering' },
+  { ar:'2021', indeks:108.5, vekst:7.2, merknad:'Materialmangel post-covid' },
+  { ar:'2022', indeks:122.1, vekst:12.5, merknad:'Energikrise, materialpristopp' },
+  { ar:'2023', indeks:127.8, vekst:4.7, merknad:'Normalisering' },
+  { ar:'2024', indeks:130.4, vekst:2.0, merknad:'Avkjøling' },
+  { ar:'2025E', indeks:134.0, vekst:2.8, merknad:'SSB/DNB Carnegie prognose' },
+];
+
+const BORS = [
+  { selskap:'Entra ASA', ticker:'ENTRA', segment:'Kontor', mverdi:'~17 mrd', da:5.2, nav:-12, relevans:'Leieindikator kontor' },
+  { selskap:'Olav Thon Eiendomsselskap', ticker:'OLT', segment:'Handel', mverdi:'~30 mrd', da:4.1, nav:-8, relevans:'Retail-sentiment' },
+  { selskap:'Selvaag Bolig', ticker:'SBO', segment:'Bolig', mverdi:'~5 mrd', da:6.8, nav:-15, relevans:'Boligmarked/byggeaktivitet' },
+  { selskap:'Veidekke ASA', ticker:'VEI', segment:'Bygg/Anlegg', mverdi:'~12 mrd', da:4.5, nav:null, relevans:'Byggekostnadsproxy' },
+  { selskap:'AF Gruppen', ticker:'AFG', segment:'Bygg/Anlegg', mverdi:'~9 mrd', da:4.2, nav:null, relevans:'Byggekostnadsproxy' },
+];
+
+const TRANS = [
+  { ar:'2021', volum:138, segment:'Kontor/Logistikk', kjoper:'Syndikater/Livsselskaper', merknad:'Historisk toppår' },
+  { ar:'2022', volum:100, segment:'Kontor', kjoper:'Norske institusjonelle', merknad:'Renten starter å stige' },
+  { ar:'2023', volum:54, segment:'Hotell/Prosjekt', kjoper:'Egenkapitalkjøpere', merknad:'Bunn — yield-usikkerhet' },
+  { ar:'2024', volum:80, segment:'Kontor/Logistikk', kjoper:'Børsnoterte/Institusjonelle', merknad:'Gradvis bedring' },
+  { ar:'2025E', volum:90, segment:'Logistikk/Hotell/Handel', kjoper:'Livsselskaper (16% andel — rekord)', merknad:'Flight to quality' },
+];
+
+const KPI = [
+  { label:'Prime yield kontor', value:'4,50 %', sub:'UNION M2 mars 2026' },
+  { label:'Toppleie CBD', value:'6 800 kr/kvm', sub:'UNION M2 mars 2026' },
+  { label:'Kontorledighet Oslo', value:'7,80 %', sub:'UNION M2 mars 2026' },
+  { label:'Styringsrente', value:'4,00 %', sub:'Norges Bank mars 2026' },
+  { label:'Transaksjonsvolum', value:'~90 mrd', sub:'Norge 2025E' },
+  { label:'Byggekostnadsindeks', value:'+2,8 %', sub:'Vekst 2025E, SSB' },
+];
+
+// ── COMPONENTS ───────────────────────────────────────────────────────
+const S = {
+  card: { background:'#fff', border:'1px solid #e8e6e0', borderRadius:8, padding:'16px 0', marginBottom:24 },
+  cardPad: { padding:'0 16px 12px' },
+  th: { padding:'8px 12px', textAlign:'left', fontWeight:500, fontSize:11, color:'#888', whiteSpace:'nowrap', textTransform:'uppercase', letterSpacing:'0.4px', borderBottom:'1px solid #e8e6e0' },
+  td: { padding:'9px 12px', whiteSpace:'nowrap', fontSize:13, borderBottom:'1px solid #f0ede8' },
+};
+
+function Badge({ value, type }) {
+  const bg = { good:'#eaf3de', warn:'#faeeda', bad:'#fcebeb', info:'#e6f1fb', neutral:'#f1efe8' };
+  const fg = { good:'#3b6d11', warn:'#854f0b', bad:'#a32d2d', info:'#185fa5', neutral:'#5f5e5a' };
+  return <span style={{ fontSize:11, fontWeight:500, padding:'2px 8px', borderRadius:4, background:bg[type]||bg.neutral, color:fg[type]||fg.neutral, display:'inline-block' }}>{value}</span>;
+}
+
+function Delta({ v }) {
+  if (v == null) return <span style={{color:'#ccc'}}>–</span>;
+  const color = v > 0.5 ? '#a32d2d' : v < -0.5 ? '#3b6d11' : '#888';
+  return <span style={{ color, fontSize:12 }}>{v > 0 ? '+' : ''}{v.toFixed(1)}pp {v > 0.5 ? '↑' : v < -0.5 ? '↓' : '→'}</span>;
+}
+
+function TH({ children }) { return <th style={S.th}>{children}</th>; }
+function TD({ children, style }) { return <td style={{ ...S.td, ...style }}>{children}</td>; }
+
+function Section({ title, source }) {
+  return (
+    <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom:12 }}>
+      <h2 style={{ fontSize:14, fontWeight:600 }}>{title}</h2>
+      {source && <span style={{ fontSize:11, color:'#aaa' }}>Kilde: {source}</span>}
+    </div>
+  );
+}
+
+// ── TABS ─────────────────────────────────────────────────────────────
+function TabLeie() {
+  return (
+    <div>
+      <div style={S.card}>
+        <div style={S.cardPad}><Section title="Leiepristabell — Oslo kontormarked" source="UNION M2, mars 2026" /></div>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+            <thead><tr><TH>Område</TH><TH>Toppleie kr/kvm/år</TH><TH>Høy standard</TH><TH>Moderat std.</TH><TH>Ledighet %</TH><TH>Δ 6 mnd</TH></tr></thead>
+            <tbody>{LEIE.map((r,i) => {
+              const ltype = r.ledighet <= 5 ? 'good' : r.ledighet <= 10 ? 'warn' : 'bad';
+              return <tr key={i} onMouseEnter={e=>e.currentTarget.style.background='#fafaf8'} onMouseLeave={e=>e.currentTarget.style.background=''}>
+                <TD style={{fontWeight:500}}>{r.omrade}</TD>
+                <TD style={{fontWeight:600}}>{r.toppleie.toLocaleString('no-NO')}</TD>
+                <TD>{r.hoy}</TD>
+                <TD>{r.moderat.toLocaleString('no-NO')}</TD>
+                <TD><Badge value={`${r.ledighet.toFixed(1)} %`} type={ltype} /></TD>
+                <TD><Delta v={r.delta} /></TD>
+              </tr>;
+            })}</tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style={S.card}>
+        <div style={S.cardPad}>
+          <Section title="Sentimentanalyse per kontorområde" source="UNION M2 / DNB Næringsmegling / Entra Konsensus / Realnor — kompilert apr 2026" />
+          <p style={{ fontSize:12, color:'#888', marginBottom:8 }}>Greencaps vurdering av markedsdynamikk, risiko og utsikter per bydel.</p>
+        </div>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+            <thead><tr><TH>Område</TH><TH>Signal</TH><TH>Leievekst</TH><TH>Ledighet</TH><TH>Risikovurdering</TH><TH>Kilde</TH></tr></thead>
+            <tbody>{SENTIMENT.map((r,i) => (
+              <tr key={i} onMouseEnter={e=>e.currentTarget.style.background='#fafaf8'} onMouseLeave={e=>e.currentTarget.style.background=''}>
+                <TD style={{fontWeight:500, whiteSpace:'normal', maxWidth:200}}>{r.omrade}</TD>
+                <TD><Badge value={r.signal} type={r.type} /></TD>
+                <TD style={{fontSize:12}}>{r.leievekst}</TD>
+                <TD style={{fontSize:12}}>{r.ledighet}</TD>
+                <TD style={{fontSize:12, whiteSpace:'normal', maxWidth:220, color:'#555'}}>{r.risiko}</TD>
+                <TD style={{fontSize:11, color:'#aaa', whiteSpace:'normal', maxWidth:160}}>{r.kilde}</TD>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+      <div style={{ fontSize:11, color:'#bbb' }}>
+        Ledighet: <span style={{ color:'#3b6d11', background:'#eaf3de', padding:'1px 6px', borderRadius:3, marginRight:6 }}>grønn ≤5%</span>
+        <span style={{ color:'#854f0b', background:'#faeeda', padding:'1px 6px', borderRadius:3, marginRight:6 }}>gul ≤10%</span>
+        <span style={{ color:'#a32d2d', background:'#fcebeb', padding:'1px 6px', borderRadius:3 }}>rød &gt;10%</span>
+      </div>
+    </div>
+  );
+}
+
+function TabYield() {
+  return (
+    <div>
+      <div style={S.card}>
+        <div style={S.cardPad}><Section title="Yield per segment — Oslo" source="UNION M2 / Entra Konsensus / DNB Næringsmegling" /></div>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+            <thead><tr><TH>Segment</TH><TH>Prime yield</TH><TH>Sekundær yield</TH><TH>Kilde</TH><TH>Per dato</TH></tr></thead>
+            <tbody>{YIELD.map((r,i) => (
+              <tr key={i} onMouseEnter={e=>e.currentTarget.style.background='#fafaf8'} onMouseLeave={e=>e.currentTarget.style.background=''}>
+                <TD style={{fontWeight:500}}>{r.segment}</TD>
+                <TD style={{fontWeight:600, color:'#185fa5'}}>{r.prime.toFixed(2)} %</TD>
+                <TD style={{color:'#555'}}>{r.sekundar != null ? `${r.sekundar.toFixed(2)} %` : '–'}</TD>
+                <TD style={{fontSize:11, color:'#aaa'}}>{r.kilde}</TD>
+                <TD style={{fontSize:12, color:'#888'}}>{r.dato}</TD>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+      <div style={S.card}>
+        <div style={S.cardPad}>
+          <Section title="Entra Konsensusrapport — historisk utvikling" source="Entra ASA (10 meglerhusbidragsytere), 2023–2025" />
+          <p style={{ fontSize:12, color:'#888', marginBottom:8 }}>Gjennomsnittsestimat fra Akershus Eiendom, CBRE, Realnor, C&W Realkapital, DNB, Malling, Newsec, Colliers, Tiger og UNION.</p>
+        </div>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+            <thead><tr><TH>Kvartal</TH><TH>Prime yield</TH><TH>Helsfyr yield</TH><TH>Lysaker yield</TH><TH>Ledighet Oslo</TH><TH>Leieprisvekst sentrum</TH><TH>Transaksjonsvolum</TH></tr></thead>
+            <tbody>{ENTRA.map((r,i) => {
+              const latest = r.kvartal === 'Q2 2025 (siste)';
+              return <tr key={i} onMouseEnter={e=>e.currentTarget.style.background='#fafaf8'} onMouseLeave={e=>e.currentTarget.style.background=''}>
+                <TD style={{fontWeight:latest?600:400, color:latest?'#185fa5':'#1a1a1a'}}>{r.kvartal}</TD>
+                <TD style={{fontWeight:500}}>{r.prime.toFixed(2)} %</TD>
+                <TD style={{fontWeight:500}}>{r.helsfyr.toFixed(2)} %</TD>
+                <TD style={{fontWeight:500}}>{r.lysaker.toFixed(2)} %</TD>
+                <TD>{r.ledighet}</TD>
+                <TD style={{color:'#3b6d11', fontWeight:500}}>{r.vekst}</TD>
+                <TD>{r.transvol}</TD>
+              </tr>;
+            })}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TabRente() {
+  const typeMap = { historisk:'neutral', faktisk:'info', prognose:'warn' };
+  return (
+    <div>
+      <div style={S.card}>
+        <div style={S.cardPad}>
+          <Section title="Renteutvikling og prognoser" source="Norges Bank / DNB Carnegie Økonomiske Utsikter jan 2026" />
+          <p style={{ fontSize:12, color:'#888', marginBottom:8 }}>Norges Bank holdt renten uendret på 4,00% i mars 2026. Kun ett kutt til forventet — inflasjon over mål og geopolitisk uro skaper usikkerhet.</p>
+        </div>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+            <thead><tr><TH>Dato</TH><TH>Type</TH><TH>Styringsrente %</TH><TH>NIBOR 3m %</TH><TH>Swap 5år %</TH></tr></thead>
+            <tbody>{RENTE.map((r,i) => (
+              <tr key={i} onMouseEnter={e=>e.currentTarget.style.background='#fafaf8'} onMouseLeave={e=>e.currentTarget.style.background=''}>
+                <TD style={{fontWeight:r.type==='faktisk'?600:400}}>{r.dato}</TD>
+                <TD><Badge value={r.type} type={typeMap[r.type]||'neutral'} /></TD>
+                <TD style={{fontWeight:500}}>{r.styrings.toFixed(2)} %</TD>
+                <TD>{r.nibor != null ? `${r.nibor.toFixed(2)} %` : <span style={{color:'#ccc'}}>–</span>}</TD>
+                <TD>{r.swap5 != null ? `${r.swap5.toFixed(2)} %` : <span style={{color:'#ccc'}}>–</span>}</TD>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+      <div style={{...S.card, padding:'16px 20px'}}>
+        <div style={{fontSize:13, fontWeight:600, marginBottom:12}}>Nøkkelimplikasjoner for næringseiendom</div>
+        {[
+          { label:'Yieldgap', tekst:'Prime yield kontor (4,50%) minus 5-års swap (3,60%) = 90 bps. Historisk pressert, men holdt seg bedre enn ventet.' },
+          { label:'Refinansiering', tekst:'Lån tatt opp 2018–2020 til 2–3% refinansieres nå til 4%+ — økt press på kontantstrøm, spesielt for belånte fond.' },
+          { label:'KPI-beskyttelse', tekst:'Inflasjon over mål (estimert 8,3% over 3 år) løfter KPI-justerte leier nominelt og støtter verdivekst forutsatt stabile yielder.' },
+          { label:'Rentebunnen', tekst:'DNB Carnegie forventer kun ett kutt til. Belånte investorer møter utfordringer med finansiell gjennomføring.' },
+        ].map((p,i) => (
+          <div key={i} style={{ display:'flex', gap:10, marginBottom:8 }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#185fa5', minWidth:140 }}>{p.label}</span>
+            <span style={{ fontSize:12, color:'#444' }}>{p.tekst}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TabBygg() {
+  return (
+    <div>
+      <div style={S.card}>
+        <div style={S.cardPad}>
+          <Section title="SSB Byggekostnadsindeks — næringsbygg" source="SSB / DNB Carnegie prognose" />
+          <p style={{ fontSize:12, color:'#888', marginBottom:8 }}>Kumulativ vekst 2019–2025E: +34%. Høye kostnader bremser nybygg og løfter break-even leienivå — presser leier opp i eksisterende bygg.</p>
+        </div>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+            <thead><tr><TH>År</TH><TH>Indeks (2019=100)</TH><TH>Vekst %</TH><TH>Merknad</TH></tr></thead>
+            <tbody>{BYGG.map((r,i) => {
+              const vcolor = r.vekst == null ? '#ccc' : r.vekst > 8 ? '#a32d2d' : r.vekst > 4 ? '#854f0b' : '#3b6d11';
+              return <tr key={i} onMouseEnter={e=>e.currentTarget.style.background='#fafaf8'} onMouseLeave={e=>e.currentTarget.style.background=''}>
+                <TD style={{fontWeight:500}}>{r.ar}</TD>
+                <TD style={{fontWeight:600}}>{r.indeks.toFixed(1)}</TD>
+                <TD style={{fontWeight:500, color:vcolor}}>{r.vekst != null ? `+${r.vekst.toFixed(1)} %` : '–'}</TD>
+                <TD style={{fontSize:12, color:'#888'}}>{r.merknad}</TD>
+              </tr>;
+            })}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TabBors() {
+  const segColor = { 'Kontor':'info', 'Handel':'warn', 'Bygg/Anlegg':'neutral', 'Bolig':'good' };
+  return (
+    <div>
+      <div style={S.card}>
+        <div style={S.cardPad}>
+          <Section title="Børsnoterte selskaper — CRE-indikatorer" source="Oslo Børs, april 2026 (indikative tall)" />
+          <p style={{ fontSize:12, color:'#888', marginBottom:8 }}>NAV-rabatt reflekterer markedets syn på underliggende eiendomsverdi — leading indicator for PE-fond.</p>
+        </div>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+            <thead><tr><TH>Selskap</TH><TH>Ticker</TH><TH>Segment</TH><TH>Markedsverdi</TH><TH>Direkteavkastning</TH><TH>NAV-rabatt %</TH><TH>CRE-relevans</TH></tr></thead>
+            <tbody>{BORS.map((r,i) => {
+              const navColor = r.nav == null ? '#ccc' : r.nav < -15 ? '#a32d2d' : r.nav < -8 ? '#854f0b' : '#3b6d11';
+              return <tr key={i} onMouseEnter={e=>e.currentTarget.style.background='#fafaf8'} onMouseLeave={e=>e.currentTarget.style.background=''}>
+                <TD style={{fontWeight:500}}>{r.selskap}</TD>
+                <TD><span style={{ fontFamily:'monospace', fontSize:12, color:'#185fa5', background:'#e6f1fb', padding:'1px 6px', borderRadius:3 }}>{r.ticker}</span></TD>
+                <TD><Badge value={r.segment} type={segColor[r.segment]||'neutral'} /></TD>
+                <TD>{r.mverdi}</TD>
+                <TD style={{fontWeight:500, color:'#3b6d11'}}>{r.da.toFixed(1)} %</TD>
+                <TD style={{fontWeight:500, color:navColor}}>{r.nav != null ? `${r.nav > 0 ? '+' : ''}${r.nav} %` : '–'}</TD>
+                <TD style={{fontSize:11, color:'#888', fontStyle:'italic'}}>{r.relevans}</TD>
+              </tr>;
+            })}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TabTrans() {
+  const trendColor = { 'Sterk':'good', 'Stigende':'good', 'Bedring':'info', 'Stabil':'neutral', 'Svak':'warn' };
+  return (
+    <div>
+      <div style={S.card}>
+        <div style={S.cardPad}><Section title="Transaksjonsvolum Norge — historikk" source="Colliers / Newsec / DNB Næringsmegling" /></div>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+            <thead><tr><TH>År</TH><TH>Volum (mrd NOK)</TH><TH>Dominerende segment</TH><TH>Kjøpertype</TH><TH>Merknad</TH></tr></thead>
+            <tbody>{TRANS.map((r,i) => {
+              const n = r.volum;
+              const color = n >= 100 ? '#3b6d11' : n >= 80 ? '#185fa5' : n < 60 ? '#a32d2d' : '#854f0b';
+              return <tr key={i} onMouseEnter={e=>e.currentTarget.style.background='#fafaf8'} onMouseLeave={e=>e.currentTarget.style.background=''}>
+                <TD style={{fontWeight:600}}>{r.ar}</TD>
+                <TD>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <div style={{ width:Math.round(n/1.5), height:8, background:color, borderRadius:2, minWidth:4 }}></div>
+                    <span style={{ fontWeight:600, color }}>{n} mrd</span>
+                  </div>
+                </TD>
+                <TD style={{fontSize:12}}>{r.segment}</TD>
+                <TD style={{fontSize:12}}>{r.kjoper}</TD>
+                <TD style={{fontSize:12, color:'#666', fontStyle:'italic'}}>{r.merknad}</TD>
+              </tr>;
+            })}</tbody>
+          </table>
+        </div>
+      </div>
+      <div style={{...S.card, padding:'16px 20px'}}>
+        <div style={{fontSize:13, fontWeight:600, marginBottom:12}}>Markedskommentar — Colliers/DNB Næringsmegling 2026</div>
+        {[
+          { label:'Flight to quality', tekst:'Livsselskaper og pensjonskapital dominerer — kjøper kun beste objekt. 16% av totalvolum i 2025 er historisk rekord.' },
+          { label:'Belånte ute', tekst:'Høy rente gjør det vanskelig for finansielt belånte investorer å finne lønnsomt regnestykke. Egenkapitalkjøpere favoriseres.' },
+          { label:'Logistikk vinner', tekst:'Størst transaksjonskategori. Prime yield 5,50% vs finansieringsrente ~4% gir fortsatt positivt regnestykke.' },
+        ].map((p,i) => (
+          <div key={i} style={{ display:'flex', gap:10, marginBottom:8 }}>
+            <span style={{ fontSize:12, fontWeight:600, color:'#185fa5', minWidth:150 }}>{p.label}</span>
+            <span style={{ fontSize:12, color:'#444' }}>{p.tekst}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── APP ───────────────────────────────────────────────────────────────
+const TABS = [
+  { id:'leie', label:'Markedsleie', comp: TabLeie },
+  { id:'yield', label:'Yielder', comp: TabYield },
+  { id:'rente', label:'Rente', comp: TabRente },
+  { id:'bygg', label:'Byggekostnader', comp: TabBygg },
+  { id:'bors', label:'Børs', comp: TabBors },
+  { id:'trans', label:'Transaksjoner', comp: TabTrans },
+];
+
+function App() {
+  const [tab, setTab] = useState('leie');
+  const Active = TABS.find(t => t.id === tab).comp;
+  return (
+    <div style={{ minHeight:'100vh' }}>
+      <div style={{ background:'#fff', borderBottom:'1px solid #e8e6e0', padding:'16px 32px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div style={{ display:'flex', alignItems:'baseline', gap:10 }}>
+          <span style={{ fontSize:18, fontWeight:600, letterSpacing:'-0.3px' }}>CRE Intelligence</span>
+          <span style={{ fontSize:13, color:'#888' }}>norsk næringseiendom</span>
+        </div>
+        <span style={{ fontSize:11, color:'#aaa' }}>Oppdatert apr 2026</span>
+      </div>
+
+      <div style={{ background:'#fff', borderBottom:'1px solid #e8e6e0', padding:'12px 32px', display:'flex', gap:0, overflowX:'auto' }}>
+        {KPI.map((k,i) => (
+          <div key={i} style={{ padding:'0 24px', borderRight: i < KPI.length-1 ? '1px solid #e8e6e0' : 'none', minWidth:130 }}>
+            <div style={{ fontSize:11, color:'#888', marginBottom:2, whiteSpace:'nowrap' }}>{k.label}</div>
+            <div style={{ fontSize:17, fontWeight:600 }}>{k.value}</div>
+            <div style={{ fontSize:10, color:'#bbb', marginTop:1 }}>{k.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ background:'#fff', borderBottom:'1px solid #e8e6e0', padding:'0 32px', display:'flex' }}>
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            style={{ padding:'12px 16px', fontSize:13, fontWeight: tab===t.id ? 600 : 400, color: tab===t.id ? '#1a1a1a' : '#666', borderBottom: tab===t.id ? '2px solid #1a1a1a' : '2px solid transparent' }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ padding:'24px 32px', maxWidth:1300 }}>
+        <Active />
+      </div>
+
+      <div style={{ padding:'16px 32px', borderTop:'1px solid #e8e6e0', fontSize:11, color:'#bbb', display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:4 }}>
+        <span>Kilder: UNION M2 · Entra Konsensusrapport · DNB Næringsmegling · Malling & Co · Realnor · SSB · Norges Bank · Oslo Børs · Colliers · Newsec</span>
+        <span>Greencap AS — intern analyse</span>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
